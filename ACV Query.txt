@@ -1,0 +1,192 @@
+Backlog Stage
+
+select sales_motion,sum(sales_value) from xxg2c.xxg2c_com_trans_acv_stage where so_number=391883797 and metric_type='ACV' and territory_type_code='DR' --and service_flag='Y'
+group by sales_motion
+
+E2E Backlog 
+
+select metric_type,sum(USD_EXTENDED_SELLING_PRICE) from XXG2C_E2E_BACKLOG_DETAILS where so_number in ( 110786332  ) --and service_flag='Y' 
+--and metric_type='TCV'
+--and metric_type is null
+and territory_type_code='DR'
+group by metric_type
+--creation_date
+
+FY20 NG
+-------
+
+OV
+-------
+/* Formatted on 4/6/2020 11:27:56 AM (QP5 v5.294) */
+  SELECT/*+parallel(256)*/ order_number,sales_motion_cd,SUM (DV_ANNUAL_NET_AMT), service_flg, latest_flag,count(1)
+    FROM xxg2c.XXG2C_EDW_BKG_ACV_ANN_NG 
+   WHERE order_number in  ('366503490')
+   and territory_type_cd='CX'
+--   and ru_service_contract_start <sysdate
+-- and service_flg='Y' 
+--  and latest_flag='Y'
+GROUP BY order_number,sales_motion_cd,service_flg, latest_flag
+order by 1
+
+DR
+----
+Select /*+parallel(32)*/ order_number,sales_motion_cd,term,service_flg,latest_flag,sum(DV_ANNUAL_NET_AMT),count(1) 
+from  xxg2c.xxg2c_EDW_BKG_ACV_TRX_NG where order_number in (
+'391883797'
+ )
+ and service_flg='Y' 
+  and latest_flag='Y'-- Direct ACV Booking 
+--  and ru_service_contract_start <sysdate--sysdate
+--and sales_motion_cd='RENEW'
+group by order_number,sales_motion_cd,service_flg,latest_flag,term
+order by 1
+
+
+FY20 Bridge
+-----------
+SELECT /*+ leading(ebt) */                             --FY20 Bridge
+sales_territory_key,
+SERVICE_FLG,
+--bookings_trx_id,
+order_number,
+global_name,
+sales_motion_cd sales_motion,
+'ACV' Metric_type,
+SUM (DV_ANNUAL_NET_AMT) LAND_SALES_VALUE
+FROM (SELECT /*+ parallel(256) leading(terr,a) */
+a.sales_territory_key,
+a.order_number,
+a.bookings_trx_id,
+a.territory_id,
+sales_motion_cd,
+DECODE (TRIM (a.global_name), 'OPL', 'CG', TRIM (a.global_name)) global_name,
+DV_ANNUAL_NET_AMT DV_ANNUAL_NET_AMT,
+ANNUITY_AMT,
+TCV_BOOK_NET_AMOUNT,
+BOOKINGS_POLICY_CODE,
+SERVICE_FLG,
+TRIM (Bookings_type) Bookings_type,
+Decode(TRIM(Bookings_Type),
+'XAAS',
+'XASRV',
+'POS',
+Decode(Upper(Nvl(Dsv_Flg,
+'N')),
+'Y',
+'DSVRV',
+'POSSC'),
+'DSV_BKG',
+'DSVRV',
+'SLS_ADJ',
+'MANAJ',
+'REV')
+ORIG_TRANS_GROUP_CODE
+FROM Xxg2c.XXG2C_EDW_BOOKINGS_TRX_FY20 a--, sc3_support.sc3_acv_dr_brdg_all_terr terr
+WHERE a.Corp_Bkg_Flag || '' = 'Y'
+--AND terr.sales_territory_key = a.sales_territory_key
+--AND terr.global_name = DECODE (TRIM (a.global_name), 'OPL', 'CG', TRIM (a.global_name))
+and order_number in ('391883797')
+--AND PROCESSED_FLAG='Y'
+--AND LATEST_FLAG='Y'
+AND NVL (a.Dv_Annual_Net_Amt, 0) != 0
+AND NVL (a.Tcv_Book_Net_Amount, 0) != 0
+AND TRIM (a.Bookings_Type) IN ('ERP',
+'AR',
+'XAAS',
+'POS',
+'SLS_ADJ')) Ebt
+GROUP BY SERVICE_FLG,sales_territory_key, global_name, sales_motion_cd,order_number
+
+OV
+---
+
+SELECT /*+ leading(ebt) */                             --FY20 Bridge
+overlay_sales_territory_key,
+SERVICE_FLG,
+bookings_trx_id,
+order_number,
+global_name,
+sales_motion_cd sales_motion,
+'ACV' Metric_type,
+SUM (DV_ANNUAL_NET_AMT) LAND_SALES_VALUE
+FROM (SELECT /*+ parallel(256) leading(terr,a) */
+a.overlay_sales_territory_key,
+a.order_number,
+a.bookings_trx_id,
+a.overlay_territory_id,
+sales_motion_cd,
+DECODE (TRIM (a.global_name), 'OPL', 'CG', TRIM (a.global_name)) global_name,
+DV_ANNUAL_NET_AMT DV_ANNUAL_NET_AMT,
+ANNUITY_AMT,
+TCV_BOOK_NET_AMOUNT,
+BOOKINGS_POLICY_CODE,
+SERVICE_FLG,
+TRIM (Bookings_type) Bookings_type,
+Decode(TRIM(Bookings_Type),
+'XAAS',
+'XASRV',
+'POS',
+Decode(Upper(Nvl(Dsv_Flg,
+'N')),
+'Y',
+'DSVRV',
+'POSSC'),
+'DSV_BKG',
+'DSVRV',
+'SLS_ADJ',
+'MANAJ',
+'REV')
+ORIG_TRANS_GROUP_CODE
+FROM Xxg2c.XXG2C_EDW_OV_BOOKINGS_TRX_FY20 a--, sc3_support.sc3_acv_dr_brdg_all_terr terr
+WHERE a.Corp_Bkg_Flag || '' = 'Y'
+and territory_type_cd='CX'
+--AND terr.sales_territory_key = a.sales_territory_key
+--AND terr.global_name = DECODE (TRIM (a.global_name), 'OPL', 'CG', TRIM (a.global_name))
+and order_number in ('366503490')
+--AND PROCESSED_FLAG='Y'
+--AND LATEST_FLAG='Y'
+AND NVL (a.Dv_Annual_Net_Amt, 0) != 0
+AND NVL (a.Tcv_Book_Net_Amount, 0) != 0
+AND TRIM (a.Bookings_Type) IN ('ERP',
+'AR',
+'XAAS',
+'POS',
+'SLS_ADJ')) Ebt
+GROUP BY SERVICE_FLG,overlay_sales_territory_key, global_name, sales_motion_cd,order_number,bookings_trx_id
+
+FY21
+------
+
+SELECT /*+ parallel(256) leading(terr,a) */
+a.sales_territory_key,a.term,
+a.territory_id,
+sales_motion_cd,
+decode(trim(a.global_name),'OPL','CG',trim(a.global_name)) global_name,
+DV_ANNUAL_NET_AMT DV_ANNUAL_NET_AMT,
+ANNUITY_AMT,
+TCV_BOOK_NET_AMOUNT,
+BOOKINGS_POLICY_CODE,
+TRIM (Bookings_type) Bookings_type,
+DECODE (TRIM (Bookings_type),
+'XAAS', 'XASRV',
+'POS', DECODE (UPPER (NVL (trim(Dsv_Flg), 'N')), 'Y', 'DSVRV', 'POSSC'),
+'DSV_BKG', 'DSVRV',
+'SLS_ADJ', 'MANAJ',
+'REV')
+ORIG_TRANS_GROUP_CODE
+FROM Xxg2c.Xxg2c_Edw_Bookings_Trx a
+--sc3_acv_dr_upscale_all_terr terr
+WHERE a.Corp_Bkg_Flag || '' = 'Y'
+AND bookings_policy_code = 'ACV'
+and order_number='111616825'
+--AND terr.sales_territory_key=a.sales_territory_key
+--AND terr.global_name=decode(trim(a.global_name),'OPL','CG',trim(a.global_name))
+AND PROCESSED_FLAG='Y'
+AND LATEST_FLAG='Y'
+AND nvl(DV_ANNUAL_NET_AMT,0)!=0
+AND NVL (a.Tcv_Book_Net_Amount, 0) != 0
+AND TRIM (a.Bookings_Type) IN ('ERP',
+'AR',
+'XAAS',
+'POS',
+'SLS_ADJ')
